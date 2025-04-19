@@ -3,14 +3,15 @@ from __future__ import annotations
 from mteb.abstasks.AbsTaskRetrieval import AbsTaskRetrieval
 from mteb.abstasks.TaskMetadata import TaskMetadata
 
+
 class RuSciFactRetrievalWithRuscibench(AbsTaskRetrieval):
     ignore_identical_ids = True
 
     metadata = TaskMetadata(
         name="RuSciFactRetrievalWithRuscibench",
         dataset={
-            "path": "...",
-            "revision": "...",
+            "path": "mlsa-iai-msu-lab/ruscifact_retrieval",
+            "revision": "d14f73f6f5fbe8212c8004b770374f55a27fef31",
         },
         description="",
         reference="",

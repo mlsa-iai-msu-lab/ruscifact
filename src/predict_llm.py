@@ -12,6 +12,7 @@ from litellm.router import Router
 from sklearn.metrics import f1_score
 from tenacity import retry, stop_after_attempt, wait_exponential
 from tqdm.asyncio import tqdm
+from src.process_dataframe import process_dataframe_router
 
 app = typer.Typer()
 
@@ -19,7 +20,10 @@ CONCURRENT_REQUESTS = 10
 MAX_RETRIES = 3
 
 
-@retry(stop=stop_after_attempt(MAX_RETRIES), wait=wait_exponential(multiplier=1, min=4, max=10))
+@retry(
+    stop=stop_after_attempt(MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+)
 async def make_request(
     session: aiohttp.ClientSession,
     prompt: str,
@@ -57,12 +61,16 @@ async def process_dataframe(
         response = await router.acompletion(
             messages=[
                 {"role": "user", "content": prompt},
-                {"role": "user", "content": f"Факт: {df['ruscifact'].iloc[index]}\nАннотация: {df['ru_abstract'].iloc[index]}"},
+                {
+                    "role": "user",
+                    "content": f"Факт: {df['ruscifact'].iloc[index]}\nАннотация: {df['ru_abstract'].iloc[index]}",
+                },
             ],
             model=model_name,
             max_tokens=4096,
         )
         return response.model_dump()
+
     print("Number of tasks:", len(df))
     tasks = [make_request(i) for i in range(len(df))]
     return await tqdm.gather(*tasks)
@@ -106,13 +114,15 @@ async def run(
     prompt = prompt_path.read_text().strip()
 
     if remote:
-        model_list = [{
-            "model_name": model_name,
-            "litellm_params": {
-                "model": model_name,
-                "api_key": os.getenv("API_KEY"),
+        model_list = [
+            {
+                "model_name": model_name,
+                "litellm_params": {
+                    "model": model_name,
+                    "api_key": os.getenv("API_KEY"),
+                },
             }
-        }]
+        ]
     else:
         model_list = [
             {
@@ -121,7 +131,7 @@ async def run(
                     "model": f"hosted_vllm/{model_name}",
                     "api_base": "http://0.0.0.0:8000/v1",
                     "api_key": "don't matter",
-                }
+                },
             },
             {
                 "model_name": model_name,
@@ -129,8 +139,8 @@ async def run(
                     "model": f"hosted_vllm/{model_name}",
                     "api_base": "http://0.0.0.0:8001/v1",
                     "api_key": "don't matter",
-                }
-            }
+                },
+            },
         ]
 
     router = Router(
@@ -139,15 +149,15 @@ async def run(
         default_max_parallel_requests=concurrent_requests,
     )
 
-    results = await process_dataframe(
-        df, prompt, router, model_name
-    )
+    results = await process_dataframe_router(df, prompt, router, model_name)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(results, output_dir / f"{model_name.replace('/', '__')}.pkl")
 
-    df["predict"] = pd.Series([pred["choices"][0]["message"]["content"] for pred in results])
-    df["model_class"] = df[~df["predict"].isna()]["predict"].apply(classify_yandex_reponse)
+    df["predict"] = results
+    df["model_class"] = df[~df["predict"].isna()]["predict"].apply(
+        classify_yandex_reponse
+    )
 
     print("Number of other:", len(df[df["model_class"] == "other"]))
     negative_f1 = f1_score(
@@ -169,15 +179,21 @@ def main(
     prompt_path: Annotated[Path, typer.Argument(help="Path to prompt file")],
     output_dir: Annotated[Path, typer.Argument(help="Directory to save results")],
     model_name: Annotated[str, typer.Argument(help="Model name")],
-    concurrent_requests: Annotated[int, typer.Option(help="Number of concurrent requests")] = 10,
-    remote: Annotated[bool, typer.Option(help="Use remote model like openai or anthropic")] = False,
+    concurrent_requests: Annotated[
+        int, typer.Option(help="Number of concurrent requests")
+    ] = 10,
+    remote: Annotated[
+        bool, typer.Option(help="Use remote model like openai or anthropic")
+    ] = False,
 ) -> None:
     if remote:
         api_key = os.environ.get("API_KEY")
         if not api_key:
             raise ValueError("API_KEY environment variable is not set")
 
-    asyncio.run(run(data_path, prompt_path, output_dir, model_name, concurrent_requests, remote))
+    asyncio.run(
+        run(data_path, prompt_path, output_dir, model_name, concurrent_requests, remote)
+    )
 
 
 if __name__ == "__main__":
