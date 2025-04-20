@@ -101,6 +101,7 @@ def merge_markup(
     df = df[~df[column].str.lower().str.contains("аннотация не содержит факт")]
     df.to_csv(output_file, index=False)
 
+
 def parse_json(texts: list[str]):
     try:
         return [json.loads(text) for text in texts][0]
@@ -124,9 +125,9 @@ def filter_by_relevancy_and_support(
         parsed = parse_json(pattern.findall(x))
         if parsed:
             relevancy, support = parsed["relevance"], parsed["support"]
-            return int(relevancy) if str(relevancy).isdigit() else None, int(support) if str(
+            return int(relevancy) if str(relevancy).isdigit() else None, int(
                 support
-            ).isdigit() else None
+            ) if str(support).isdigit() else None
         return None, None
 
     df[["relevancy", "support"]] = (
@@ -154,8 +155,16 @@ def filter_by_relevancy_and_support(
     df = df[df["negative_ruscifact_extracted"].str.len() > 15]
     df = df[
         (~df["negative_ruscifact_extracted"].str.contains("нет цепочки рассуждений"))
-        & (~df["negative_ruscifact_extracted"].str.contains("собой отдельное утверждение"))
-        & (~df["negative_ruscifact_extracted"].str.contains("отсутствует цепочка рассуждений"))
+        & (
+            ~df["negative_ruscifact_extracted"].str.contains(
+                "собой отдельное утверждение"
+            )
+        )
+        & (
+            ~df["negative_ruscifact_extracted"].str.contains(
+                "отсутствует цепочка рассуждений"
+            )
+        )
     ]
     if limit:
         df = df.sample(limit, random_state=42)

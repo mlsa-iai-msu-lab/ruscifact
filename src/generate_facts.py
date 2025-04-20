@@ -11,7 +11,9 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 from tqdm.asyncio import tqdm
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 tqdm.pandas()
@@ -179,8 +181,9 @@ prompts = {
 ```
 relevance и support могут принимать значения от 0 до 10, где 0 - не релевантно (не подтверждает факт), 10 - максимально релевантно (подтверждает факт).
 
-```{text}```"""
+```{text}```""",
 }
+
 
 class Markup(BaseModel):
     markup_class: str
@@ -217,7 +220,9 @@ class RateLimiter:
     async def acquire(self):
         async with self._lock:
             now = asyncio.get_event_loop().time()
-            self.requests = [req for req in self.requests if now - req < self.time_window]
+            self.requests = [
+                req for req in self.requests if now - req < self.time_window
+            ]
 
             if len(self.requests) >= self.max_requests:
                 sleep_time = self.requests[0] + self.time_window - now
@@ -225,6 +230,7 @@ class RateLimiter:
                     await asyncio.sleep(sleep_time)
 
             self.requests.append(now)
+
 
 async def get_completion(
     semaphore: asyncio.Semaphore,
@@ -253,6 +259,7 @@ async def get_completion(
             logging.error(f"Failed to get completion for text: {text} with error: {e}")
             return None
 
+
 async def get_parse(
     semaphore: asyncio.Semaphore,
     client: AsyncOpenAI,
@@ -268,19 +275,21 @@ async def get_parse(
             response = await client.beta.chat.completions.parse(
                 messages=[
                     {"role": "system", "content": prompts[prompt_name]},
-                    {
-                        "role": "user",
-                        "content": text
-                    }
+                    {"role": "user", "content": text},
                 ],
                 n=1,
                 model=model_name,
                 response_format=Markup,
             )
-            return response.choices[0].message.parsed.model_dump() if response.choices[0].message.parsed is not None else None
+            return (
+                response.choices[0].message.parsed.model_dump()
+                if response.choices[0].message.parsed is not None
+                else None
+            )
         except Exception as e:
             logging.error(f"Failed to get completion for text: {text} with error: {e}")
             return None
+
 
 async def process_batch(
     batch: list[str],
@@ -294,7 +303,18 @@ async def process_batch(
 ):
     func = get_completion if mode == "completion" else get_parse
     return await tqdm.gather(
-        *[func(semaphore, client, text, prompt_name, model_name, rate_limiter, max_completion_tokens) for text in batch]
+        *[
+            func(
+                semaphore,
+                client,
+                text,
+                prompt_name,
+                model_name,
+                rate_limiter,
+                max_completion_tokens,
+            )
+            for text in batch
+        ]
     )
 
 
@@ -313,6 +333,7 @@ def main(
     max_completion_tokens: int | None = None,
 ):
     assert mode in ["completion", "parse"]
+
     async def _main():
         if input_file.is_file():
             df = pd.read_csv(input_file)
@@ -325,13 +346,17 @@ def main(
             )
 
         semaphore = asyncio.Semaphore(10)
-        client = AsyncOpenAI(base_url=base_url, api_key=os.environ.get("API_KEY", "dont matter"))
+        client = AsyncOpenAI(
+            base_url=base_url, api_key=os.environ.get("API_KEY", "dont matter")
+        )
 
         output_file.parent.mkdir(exist_ok=True, parents=True)
         rate_limiter = RateLimiter(requests_per_minute)
 
         for i, batch_df in enumerate(chunks(data, chunk_size)):
-            output = output_file.parent / (output_file.stem + f"_{i}" + output_file.suffix)
+            output = output_file.parent / (
+                output_file.stem + f"_{i}" + output_file.suffix
+            )
             if output.exists():
                 print(output)
                 batch_df = pd.read_csv(output)
@@ -339,7 +364,8 @@ def main(
                     [
                         row[source_column_name]
                         for _, row in batch_df.iterrows()
-                        if target_column_name not in row or pd.isna(row[target_column_name])
+                        if target_column_name not in row
+                        or pd.isna(row[target_column_name])
                     ],
                     semaphore,
                     client,
@@ -349,9 +375,9 @@ def main(
                     rate_limiter,
                     max_completion_tokens,
                 )
-                batch_df.loc[batch_df[target_column_name].isnull(), target_column_name] = (
-                    completions
-                )
+                batch_df.loc[
+                    batch_df[target_column_name].isnull(), target_column_name
+                ] = completions
             else:
                 completions = await process_batch(
                     [row[source_column_name] for row in batch_df],

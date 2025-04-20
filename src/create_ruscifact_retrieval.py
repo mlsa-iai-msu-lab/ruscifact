@@ -28,7 +28,9 @@ def main(
         ruscibench_df = ruscibench_df[
             ~ruscibench_df["@id"].astype(str).isin(df["@id"].astype(str))
         ]
-        corpus_data["_id"].extend(ruscibench_df["@id"].apply(lambda x: f"corpus-{x}").tolist())
+        corpus_data["_id"].extend(
+            ruscibench_df["@id"].apply(lambda x: f"corpus-{x}").tolist()
+        )
         corpus_data["text"].extend(ruscibench_df["ru_abstract"].tolist())
 
     queries_data = {
