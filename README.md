@@ -1,3 +1,9 @@
+## ruSciFact: Open Benchmark for Verifying Scientific Facts in Russian
+
+[![Dataset on HF](https://huggingface.co/datasets/huggingface/badges/resolve/main/dataset-on-hf-sm-dark.svg)](https://huggingface.co/collections/mlsa-iai-msu-lab/ruscifact-6803f71f2d3025988ebc489e)
+
+This repository contains the resources for the ruSciFact benchmark, designed for verifying scientific facts in Russian scientific abstracts. It includes the ruSciFact dataset, the code for the LLM-based fact generation pipeline used to create it, and scripts for evaluating models on this benchmark.
+
 ## Generate supports facts
 
 #### Generate facts
